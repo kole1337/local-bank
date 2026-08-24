@@ -49,3 +49,11 @@ Or open [`/onboarding`](http://localhost:3000/onboarding) to submit a brand-new 
 ## Notes
 
 This is a fictional bank for demo purposes — no real financial data or integrations are involved.
+
+## To do
+
+[ ] introduce security layer
+
+[ ] deploy demo
+
+[ ] mobile app
