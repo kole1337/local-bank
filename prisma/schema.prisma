@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  CUSTOMER
+  EMPLOYEE
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  RESUBMISSION_REQUESTED
+}
+
+enum DocumentType {
+  PASSPORT
+  NATIONAL_ID
+  DRIVERS_LICENSE
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER_IN
+  TRANSFER_OUT
+  PAYMENT
+}
+
+enum NotificationType {
+  APPROVAL
+  DECLINE
+  RESUBMISSION
+  GENERAL
+}
+
+model User {
+  id            String            @id @default(cuid())
+  email         String            @unique
+  passwordHash  String
+  role          Role              @default(CUSTOMER)
+  name          String
+  dateOfBirth   DateTime
+  address       String
+  status        ApplicationStatus @default(PENDING)
+  declineReason String?
+  createdAt     DateTime          @default(now())
+
+  document      IdentityDocument?
+  account       Account?
+  notifications Notification[]
+}
+
+model IdentityDocument {
+  id            String         @id @default(cuid())
+  userId        String         @unique
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  imageData     String
+  type          DocumentType?
+  placeOfBirth  String?
+  placeOfIssue  String?
+  expiryDate    DateTime?
+  status        DocumentStatus @default(PENDING)
+  updatedAt     DateTime       @updatedAt
+}
+
+model Account {
+  id            String        @id @default(cuid())
+  userId        String        @unique
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountNumber String        @unique
+  balanceCents  Int           @default(0)
+  createdAt     DateTime      @default(now())
+  transactions  Transaction[]
+}
+
+model Transaction {
+  id           String          @id @default(cuid())
+  accountId    String
+  account      Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type         TransactionType
+  amountCents  Int
+  description  String
+  counterparty String?
+  createdAt    DateTime        @default(now())
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  message   String
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+}
