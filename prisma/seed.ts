@@ -39,6 +39,7 @@ function accountNumber(): string {
 async function main() {
   console.log("Seeding database...");
 
+  await prisma.auditLog.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.transaction.deleteMany();
   await prisma.account.deleteMany();

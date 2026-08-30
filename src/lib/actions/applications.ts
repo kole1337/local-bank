@@ -5,6 +5,15 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { declineSchema, documentUpdateSchema } from "@/lib/validators";
+import { AuditAction, recordAuditForCurrentUser } from "@/lib/audit";
+
+async function describeTarget(userId: string): Promise<string> {
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, email: true },
+  });
+  return target ? `${target.name} (${target.email})` : userId;
+}
 
 async function requireEmployee() {
   const session = await getSession();
@@ -27,6 +36,11 @@ export async function approveApplicationAction(userId: string) {
       },
     }),
   ]);
+
+  await recordAuditForCurrentUser(
+    AuditAction.APPLICATION_APPROVED,
+    `Approved ${await describeTarget(userId)}`,
+  );
 
   revalidatePath("/admin");
   revalidatePath("/admin/customers");
@@ -61,6 +75,11 @@ export async function declineApplicationAction(
     }),
   ]);
 
+  await recordAuditForCurrentUser(
+    AuditAction.APPLICATION_DECLINED,
+    `Declined ${await describeTarget(userId)} — reason: ${parsed.data.reason}`,
+  );
+
   revalidatePath("/admin");
   revalidatePath("/admin/customers");
   redirect("/admin");
@@ -82,6 +101,11 @@ export async function requestResubmissionAction(userId: string) {
       },
     }),
   ]);
+
+  await recordAuditForCurrentUser(
+    AuditAction.RESUBMISSION_REQUESTED,
+    `Requested a new ID document from ${await describeTarget(userId)}`,
+  );
 
   revalidatePath(`/admin/review/${userId}`);
 }
@@ -117,6 +141,11 @@ export async function updateDocumentDetailsAction(
     },
   });
 
+  await recordAuditForCurrentUser(
+    AuditAction.DOCUMENT_VERIFIED,
+    `Verified the identity document for ${await describeTarget(userId)}`,
+  );
+
   revalidatePath(`/admin/review/${userId}`);
   return { success: true };
 }
@@ -139,6 +168,8 @@ export async function resubmitIdentityImageAction(formData: FormData) {
     where: { userId: session.userId },
     data: { imageData, status: "PENDING" },
   });
+
+  await recordAuditForCurrentUser(AuditAction.IDENTITY_RESUBMITTED);
 
   revalidatePath("/dashboard");
   revalidatePath("/profile");

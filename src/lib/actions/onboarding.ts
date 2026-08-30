@@ -2,9 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/auth";
+import { getSession, hashPassword } from "@/lib/auth";
 import { onboardingDetailsSchema } from "@/lib/validators";
 import { generateAccountNumber } from "@/lib/utils";
+import { AuditAction, recordAudit } from "@/lib/audit";
 
 export type OnboardingState = {
   errors?: Partial<Record<"name" | "dateOfBirth" | "email" | "address" | "password" | "confirmPassword" | "idImage", string>>;
@@ -39,8 +40,23 @@ export async function submitOnboardingAction(
   }
 
   const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+
+  // A customer whose application is still pending or was declined may submit a
+  // fresh application — but only for their own account, while signed in. Anyone
+  // else hitting an existing email just gets the generic "already exists".
+  let reapplyUserId: string | null = null;
   if (existing) {
-    return { errors: { email: "An account with this email already exists" }, values };
+    const session = await getSession();
+    const isSelf = session?.userId === existing.id;
+    const canReapply =
+      isSelf &&
+      existing.role === "CUSTOMER" &&
+      (existing.status === "PENDING" || existing.status === "DECLINED");
+
+    if (!canReapply) {
+      return { errors: { email: "An account with this email already exists" }, values };
+    }
+    reapplyUserId = existing.id;
   }
 
   const idImage = formData.get("idImage");
@@ -59,7 +75,48 @@ export async function submitOnboardingAction(
 
   const passwordHash = await hashPassword(parsed.data.password);
 
-  await prisma.user.create({
+  if (reapplyUserId) {
+    await prisma.user.update({
+      where: { id: reapplyUserId },
+      data: {
+        name: parsed.data.name,
+        dateOfBirth: new Date(parsed.data.dateOfBirth),
+        address: parsed.data.address,
+        passwordHash,
+        status: "PENDING",
+        declineReason: null,
+        document: {
+          upsert: {
+            create: { imageData, status: "PENDING" },
+            update: {
+              imageData,
+              status: "PENDING",
+              type: null,
+              placeOfBirth: null,
+              placeOfIssue: null,
+              expiryDate: null,
+            },
+          },
+        },
+        account: {
+          upsert: {
+            create: { accountNumber: generateAccountNumber(), balanceCents: 0 },
+            update: {},
+          },
+        },
+      },
+    });
+
+    await recordAudit(AuditAction.APPLICATION_RESUBMITTED, {
+      userId: reapplyUserId,
+      actorEmail: parsed.data.email,
+      actorRole: "CUSTOMER",
+    });
+
+    redirect("/onboarding/submitted");
+  }
+
+  const created = await prisma.user.create({
     data: {
       name: parsed.data.name,
       email: parsed.data.email,
@@ -81,6 +138,12 @@ export async function submitOnboardingAction(
         },
       },
     },
+  });
+
+  await recordAudit(AuditAction.APPLICATION_SUBMITTED, {
+    userId: created.id,
+    actorEmail: created.email,
+    actorRole: "CUSTOMER",
   });
 
   redirect("/onboarding/submitted");

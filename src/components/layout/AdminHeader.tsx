@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, Users } from "lucide-react";
+import { ClipboardList, ScrollText, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
@@ -8,7 +8,11 @@ import { LogoutButton } from "./LogoutButton";
 
 export function AdminHeader() {
   const pathname = usePathname();
-  const active = pathname.startsWith("/admin/customers") ? "customers" : "applications";
+  const active = pathname.startsWith("/admin/customers")
+    ? "customers"
+    : pathname.startsWith("/admin/activity")
+      ? "activity"
+      : "applications";
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-surface/90 backdrop-blur">
@@ -39,6 +43,18 @@ export function AdminHeader() {
             >
               <Users className="h-4 w-4" />
               Customers
+            </Link>
+            <Link
+              href="/admin/activity"
+              className={
+                "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors " +
+                (active === "activity"
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-surface-muted hover:text-foreground")
+              }
+            >
+              <ScrollText className="h-4 w-4" />
+              Activity
             </Link>
           </nav>
         </div>

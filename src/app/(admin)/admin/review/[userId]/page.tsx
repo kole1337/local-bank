@@ -8,6 +8,7 @@ import { ApproveForm } from "@/components/admin/ApproveForm";
 import { DeclineDialog } from "@/components/admin/DeclineDialog";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { applicationStatusMeta } from "@/lib/status";
+import { AuditAction, recordAuditForCurrentUser } from "@/lib/audit";
 
 export default async function ReviewApplicationPage({
   params,
@@ -22,6 +23,11 @@ export default async function ReviewApplicationPage({
   });
 
   if (!applicant || applicant.role !== "CUSTOMER") notFound();
+
+  await recordAuditForCurrentUser(
+    AuditAction.VIEWED_APPLICATION,
+    `Opened the application review for ${applicant.name} (${applicant.email})`,
+  );
 
   const appMeta = applicationStatusMeta[applicant.status];
 

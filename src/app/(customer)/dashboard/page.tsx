@@ -1,11 +1,14 @@
-import { Clock, ShieldAlert } from "lucide-react";
+import { Calendar, Clock, Mail, MapPin, ShieldAlert } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { LinkButton } from "@/components/ui/LinkButton";
 import { TransactionList } from "@/components/customer/TransactionList";
+import { documentStatusMeta } from "@/lib/status";
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -14,6 +17,7 @@ export default async function DashboardPage() {
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
     include: {
+      document: true,
       account: {
         include: {
           transactions: { orderBy: { createdAt: "desc" }, take: 15 },
@@ -26,29 +30,60 @@ export default async function DashboardPage() {
 
   if (user.status === "PENDING") {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
-        <span className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
-          <Clock className="h-6 w-6" />
-        </span>
-        <h1 className="text-xl font-semibold text-foreground">Your application is under review</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Thanks for applying, {user.name.split(" ")[0]}. Our team is reviewing your details and identity
-          document. We&apos;ll notify you as soon as a decision has been made.
-        </p>
+      <div className="mx-auto max-w-lg space-y-6 py-10">
+        <div className="text-center">
+          <span className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-warning-accent text-warning-foreground">
+            <Clock className="h-6 w-6" />
+          </span>
+          <StatusPill tone="warning">Pending</StatusPill>
+          <h1 className="mt-3 text-xl font-semibold text-foreground">
+            Your application is under review
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Thanks for applying, {user.name.split(" ")[0]}. Our team is reviewing your details and
+            identity document — we&apos;ll notify you as soon as a decision has been made.
+          </p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Your application</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <DetailRow icon={Mail} label="Email" value={user.email} />
+            <DetailRow icon={Calendar} label="Date of birth" value={formatDate(user.dateOfBirth)} />
+            <DetailRow icon={MapPin} label="Address" value={user.address} />
+            <DetailRow icon={Clock} label="Submitted" value={formatDate(user.createdAt)} />
+            {user.document && (
+              <div className="flex items-center justify-between border-t border-border pt-4">
+                <span className="text-sm text-muted-foreground">Identity document</span>
+                <StatusPill tone={documentStatusMeta[user.document.status].tone}>
+                  {documentStatusMeta[user.document.status].label}
+                </StatusPill>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   if (user.status === "DECLINED") {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
-        <span className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-danger-accent text-danger">
+      <div className="mx-auto max-w-lg space-y-6 py-10 text-center">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-danger-accent text-danger">
           <ShieldAlert className="h-6 w-6" />
         </span>
-        <h1 className="text-xl font-semibold text-foreground">Your application was declined</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {user.declineReason ?? "Please contact support for more information."}
-        </p>
+        <StatusPill tone="negative">Declined</StatusPill>
+        <h1 className="text-xl font-semibold text-foreground">
+          Your application was declined, please start a new one
+        </h1>
+        {user.declineReason && (
+          <p className="text-sm text-muted-foreground">{user.declineReason}</p>
+        )}
+        <div>
+          <LinkButton href="/onboarding">Start a new application</LinkButton>
+        </div>
       </div>
     );
   }
@@ -86,6 +121,28 @@ export default async function DashboardPage() {
           </Card>
         </>
       )}
+    </div>
+  );
+}
+
+function DetailRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Mail;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-muted text-muted-foreground">
+        <Icon className="h-4 w-4" />
+      </span>
+      <div>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-sm font-medium text-foreground">{value}</p>
+      </div>
     </div>
   );
 }

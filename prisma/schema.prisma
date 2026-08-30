@@ -60,6 +60,27 @@ model User {
   document      IdentityDocument?
   account       Account?
   notifications Notification[]
+  auditLogs     AuditLog[]
+}
+
+/// One row per meaningful action taken by a customer or a member of bank staff.
+/// Captures who did what, plus the device / browser / IP the request came from.
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  actorEmail String?
+  actorRole  String?
+  action     String
+  detail     String?
+  ipAddress  String?
+  userAgent  String?
+  device     String?
+  browser    String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId])
 }
 
 model IdentityDocument {

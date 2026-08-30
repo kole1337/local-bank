@@ -8,6 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { TransactionList } from "@/components/customer/TransactionList";
 import { applicationStatusMeta, documentStatusMeta, documentTypeLabels } from "@/lib/status";
+import { AuditAction, recordAuditForCurrentUser } from "@/lib/audit";
 
 export default async function CustomerPersonViewPage({
   params,
@@ -25,6 +26,11 @@ export default async function CustomerPersonViewPage({
   });
 
   if (!customer || customer.role !== "CUSTOMER") notFound();
+
+  await recordAuditForCurrentUser(
+    AuditAction.VIEWED_CUSTOMER,
+    `Viewed the account of ${customer.name} (${customer.email})`,
+  );
 
   const transactions = customer.account?.transactions ?? [];
   const totalVolumeCents = transactions.reduce((sum, tx) => sum + Math.abs(tx.amountCents), 0);
